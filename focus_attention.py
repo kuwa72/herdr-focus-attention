@@ -6,8 +6,6 @@ Ranks agents from `herdr agent list` by a configurable status priority
 state change first. If the currently focused agent is in the ranked queue,
 jumps to the one after (or before, with --prev) it, so repeated invocation
 cycles through every agent needing attention.
-
-Port of focus-attention.sh / focus-attention.ps1 as a Herdr plugin.
 Requires Python 3.11+ (standard library only).
 """
 
