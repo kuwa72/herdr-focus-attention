@@ -1,6 +1,6 @@
 # herdr-focus-attention
 
-Herdr plugin: jump to the next / previous agent needing attention.
+Herdr plugin: cycle through agents needing attention.
 
 Ranks agents by status priority (`blocked` > `done` > `idle` by default) and,
 within the same status, most recent state change first. If the agent you are
@@ -8,9 +8,7 @@ already looking at is in the queue, it jumps to the one after (or before) it,
 so repeated presses cycle through every agent that needs you. When no agent
 needs attention, a toast says so instead of failing silently.
 
-Shell (`focus-attention.sh`) and PowerShell (`focus-attention.ps1`) ports of
-the same logic also work as plain `[[keys.command]]` entries; this plugin is
-the shareable, configurable form.
+[English](README.md) | [日本語](README.ja.md) | [中文](README.zh-CN.md)
 
 ## Install
 
@@ -31,13 +29,13 @@ Herdr owns keybindings, so bind the actions in `~/.config/herdr/config.toml`:
 key = "prefix+a"
 type = "plugin_action"
 command = "kuwa72.focus-attention.next"
-description = "直近の入力待ちエージェントへ移動"
+description = "Focus next agent needing attention"
 
 [[keys.command]]
 key = "prefix+shift+a"
 type = "plugin_action"
 command = "kuwa72.focus-attention.prev"
-description = "直近の入力待ちエージェントへ移動（逆順）"
+description = "Focus previous agent needing attention"
 ```
 
 Then apply:
@@ -65,14 +63,6 @@ scope = "all"
 ```
 
 Config is read on every invocation; no reload needed.
-
-## Differences from `martin-ro/herdr-next-agent`
-
-- Focuses by `pane_id` (the other plugin passes `terminal_id`, which the
-  agent API rejects with `agent_not_found`).
-- Sorts same-status agents by most recent state change (`state_change_seq`),
-  not by opaque terminal id order.
-- Ships a `prev` action for reverse cycling.
 
 ## Troubleshooting
 
