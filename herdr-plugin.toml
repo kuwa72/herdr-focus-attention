@@ -1,0 +1,18 @@
+id = "kuwa72.focus-attention"
+name = "Focus Attention"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Jump to the next/previous agent needing attention (blocked > done > idle, most recent first)"
+platforms = ["linux", "macos", "windows"]
+
+[[actions]]
+id = "next"
+title = "Focus next agent needing attention"
+contexts = ["global", "workspace"]
+command = ["python3", "focus_attention.py"]
+
+[[actions]]
+id = "prev"
+title = "Focus previous agent needing attention"
+contexts = ["global", "workspace"]
+command = ["python3", "focus_attention.py", "--prev"]

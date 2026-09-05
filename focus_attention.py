@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""Focus the next/previous agent needing attention.
+
+Ranks agents from `herdr agent list` by a configurable status priority
+(default: blocked > done > idle) and, within the same status, most recent
+state change first. If the currently focused agent is in the ranked queue,
+jumps to the one after (or before, with --prev) it, so repeated invocation
+cycles through every agent needing attention.
+
+Port of focus-attention.sh / focus-attention.ps1 as a Herdr plugin.
+Requires Python 3.11+ (standard library only).
+"""
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+DEFAULT_CONFIG_TEXT = """\
+# Agent statuses that count as "needs attention", highest priority first.
+# Statuses not listed are never jumped to.
+# Known statuses: blocked, done, working, idle, unknown
+priority = ["blocked", "done", "idle"]
+
+# "all" = consider agents in every workspace; "workspace" = active workspace only
+scope = "all"
+"""
+
+DEFAULTS = {
+    "priority": ["blocked", "done", "idle"],
+    "scope": "all",
+}
+
+
+def herdr_bin():
+    # HERDR_BIN_PATH may carry a " (deleted)" suffix after an in-place update.
+    bin_path = os.environ.get("HERDR_BIN_PATH", "").removesuffix(" (deleted)")
+    if bin_path and Path(bin_path).is_file():
+        return bin_path
+    return shutil.which("herdr") or str(Path.home() / ".local" / "bin" / "herdr")
+
+
+def load_config():
+    config_dir = os.environ.get("HERDR_PLUGIN_CONFIG_DIR")
+    if not config_dir:
+        return dict(DEFAULTS)
+    path = Path(config_dir) / "config.toml"
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(DEFAULT_CONFIG_TEXT)
+    try:
+        raw = tomllib.loads(path.read_text())
+    except (OSError, tomllib.TOMLDecodeError) as e:
+        print(f"focus-attention: ignoring invalid {path}: {e}", file=sys.stderr)
+        raw = {}
+    config = dict(DEFAULTS)
+    if isinstance(raw.get("priority"), list):
+        config["priority"] = [s for s in raw["priority"] if isinstance(s, str)]
+    if raw.get("scope") in ("all", "workspace"):
+        config["scope"] = raw["scope"]
+    return config
+
+
+def run_herdr(*args):
+    result = subprocess.run(
+        [herdr_bin(), *args], capture_output=True, text=True, timeout=10
+    )
+    if result.returncode != 0:
+        print(
+            f"focus-attention: herdr {' '.join(args)} failed: {result.stderr.strip()}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return result.stdout
+
+
+def main():
+    args = sys.argv[1:]
+    prev = "--prev" in args
+    states = [a for a in args if not a.startswith("-")] or None
+
+    config = load_config()
+    priority = states if states else config["priority"]
+
+    agents = json.loads(run_herdr("agent", "list"))["result"]["agents"]
+
+    if states is None and config["scope"] == "workspace":
+        workspace = os.environ.get("HERDR_ACTIVE_WORKSPACE_ID") or os.environ.get(
+            "HERDR_WORKSPACE_ID"
+        )
+        if workspace:
+            agents = [a for a in agents if a.get("workspace_id") == workspace]
+
+    ranked = sorted(
+        (a for a in agents if a.get("agent_status") in priority),
+        key=lambda a: (
+            priority.index(a["agent_status"]),
+            -(a.get("state_change_seq") or 0),
+        ),
+    )
+    if not ranked:
+        # Best-effort toast so an empty queue is distinguishable from a broken keybinding.
+        subprocess.run(
+            [herdr_bin(), "notification", "show", "No agent needs attention",
+             "--sound", "none"],
+            capture_output=True,
+            timeout=10,
+        )
+        return
+
+    target = ranked[0] if not prev else ranked[-1]
+    for i, a in enumerate(ranked):
+        if a.get("focused"):
+            target = ranked[(i - 1 if prev else i + 1) % len(ranked)]
+            break
+
+    pane_id = target.get("pane_id")
+    if not pane_id:
+        print("focus-attention: ranked agent has no pane_id", file=sys.stderr)
+        sys.exit(1)
+    run_herdr("agent", "focus", pane_id)
+
+
+if __name__ == "__main__":
+    main()
