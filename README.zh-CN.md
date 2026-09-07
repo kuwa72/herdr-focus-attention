@@ -44,6 +44,23 @@ description = "返回上一个需要处理的 Agent"
 herdr server reload-config
 ```
 
+`f9`、`f10` 等功能键也可以不经过前缀直接绑定。
+与可打印按键不同，功能键不会拦截文字输入，按一下即可触发。
+
+```toml
+[[keys.command]]
+key = "f9"
+type = "plugin_action"
+command = "kuwa72.focus-attention.next"
+description = "跳转到下一个需要处理的 Agent"
+
+[[keys.command]]
+key = "shift+f9"  # 也可以用 "f10"
+type = "plugin_action"
+command = "kuwa72.focus-attention.prev"
+description = "返回上一个需要处理的 Agent"
+```
+
 ## 配置
 
 首次运行时，插件会在其配置目录下生成 `config.toml`。查看路径：
