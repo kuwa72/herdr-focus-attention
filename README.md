@@ -44,6 +44,23 @@ Then apply:
 herdr server reload-config
 ```
 
+Function keys can be bound directly, without the prefix. Unlike printable
+keys they do not steal typed input, so a single press invokes the action.
+
+```toml
+[[keys.command]]
+key = "f9"
+type = "plugin_action"
+command = "kuwa72.focus-attention.next"
+description = "Focus next agent needing attention"
+
+[[keys.command]]
+key = "shift+f9"  # "f10" works too
+type = "plugin_action"
+command = "kuwa72.focus-attention.prev"
+description = "Focus previous agent needing attention"
+```
+
 ## Configuration
 
 The plugin seeds a `config.toml` in its config dir on first run. Find it with:
