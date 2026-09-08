@@ -10,6 +10,8 @@
 
 [English](README.md) | [日本語](README.ja.md) | [中文](README.zh-CN.md)
 
+![演示：轮流查看需要处理的 Agent](docs/demo.gif)
+
 ## 安装
 
 ```bash

@@ -10,6 +10,8 @@
 
 [English](README.md) | [日本語](README.ja.md) | [中文](README.zh-CN.md)
 
+![デモ: 要対応エージェントの巡回](docs/demo.gif)
+
 ## インストール
 
 ```bash
