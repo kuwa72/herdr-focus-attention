@@ -10,6 +10,8 @@ needs attention, a toast says so instead of failing silently.
 
 [English](README.md) | [日本語](README.ja.md) | [中文](README.zh-CN.md)
 
+![Demo: cycling through agents needing attention](docs/demo.gif)
+
 ## Install
 
 ```bash
