@@ -3,9 +3,10 @@
 
 Ranks agents from `herdr agent list` by a configurable status priority
 (default: blocked > done > idle) and, within the same status, most recent
-state change first. If the currently focused agent is in the ranked queue,
-jumps to the one after (or before, with --prev) it, so repeated invocation
-cycles through every agent needing attention.
+state change first. The first press jumps to the highest-priority agent;
+while focus stays on the last jumped-to agent, repeated presses step
+forward (or backward, with --prev) through the queue, so cycling reaches
+every agent needing attention.
 Requires Python 3.11+ (standard library only).
 """
 
@@ -14,6 +15,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import tomllib
 from pathlib import Path
 
@@ -31,6 +33,10 @@ DEFAULTS = {
     "priority": ["blocked", "done", "idle"],
     "scope": "all",
 }
+
+# Older than this, a recorded jump target no longer counts as mid-cycle:
+# the user may have settled on that pane for unrelated work.
+CYCLE_TTL_SECONDS = 600
 
 
 def herdr_bin():
@@ -75,6 +81,49 @@ def run_herdr(*args):
     return result.stdout
 
 
+def state_path():
+    config_dir = os.environ.get("HERDR_PLUGIN_CONFIG_DIR")
+    if config_dir:
+        return Path(config_dir) / "state.json"
+    base = Path(
+        os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state"
+    )
+    return base / "herdr-focus-attention" / "state.json"
+
+
+def load_state():
+    try:
+        raw = json.loads(state_path().read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    pane_id = raw.get("pane_id")
+    unix_ms = raw.get("unix_ms")
+    if not isinstance(pane_id, str) or not isinstance(unix_ms, (int, float)):
+        return None
+    if time.time() - unix_ms / 1000 > CYCLE_TTL_SECONDS:
+        return None
+    return pane_id
+
+
+def save_state(pane_id):
+    path = state_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps({"pane_id": pane_id, "unix_ms": int(time.time() * 1000)})
+        )
+    except OSError:
+        pass
+
+
+def notify(message):
+    subprocess.run(
+        [herdr_bin(), "notification", "show", message, "--sound", "none"],
+        capture_output=True,
+        timeout=10,
+    )
+
+
 def main():
     args = sys.argv[1:]
     prev = "--prev" in args
@@ -101,25 +150,32 @@ def main():
     )
     if not ranked:
         # Best-effort toast so an empty queue is distinguishable from a broken keybinding.
-        subprocess.run(
-            [herdr_bin(), "notification", "show", "No agent needs attention",
-             "--sound", "none"],
-            capture_output=True,
-            timeout=10,
-        )
+        notify("No agent needs attention")
         return
 
-    target = ranked[0] if not prev else ranked[-1]
-    for i, a in enumerate(ranked):
-        if a.get("focused"):
-            target = ranked[(i - 1 if prev else i + 1) % len(ranked)]
-            break
+    focused_idx = next(
+        (i for i, a in enumerate(ranked) if a.get("focused")), None
+    )
+    continuing = (
+        focused_idx is not None
+        and load_state() == ranked[focused_idx].get("pane_id")
+    )
+    if continuing:
+        step = -1 if prev else 1
+        target = ranked[(focused_idx + step) % len(ranked)]
+    else:
+        target = ranked[0]
 
     pane_id = target.get("pane_id")
     if not pane_id:
         print("focus-attention: ranked agent has no pane_id", file=sys.stderr)
         sys.exit(1)
-    run_herdr("agent", "focus", pane_id)
+
+    if focused_idx is not None and ranked[focused_idx].get("pane_id") == pane_id:
+        notify("Already on the most urgent agent")
+    else:
+        run_herdr("agent", "focus", pane_id)
+    save_state(pane_id)
 
 
 if __name__ == "__main__":

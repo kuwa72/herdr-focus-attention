@@ -3,10 +3,11 @@
 Herdr plugin: cycle through agents needing attention.
 
 Ranks agents by status priority (`blocked` > `done` > `idle` by default) and,
-within the same status, most recent state change first. If the agent you are
-already looking at is in the queue, it jumps to the one after (or before) it,
-so repeated presses cycle through every agent that needs you. When no agent
-needs attention, a toast says so instead of failing silently.
+within the same status, most recent state change first. The first press jumps
+to the highest-priority agent; while you stay on the jumped-to agent, further
+presses step forward (or backward) through the queue, so repeated presses
+cycle through every agent that needs you. When no agent needs attention, a
+toast says so instead of failing silently.
 
 [English](README.md) | [日本語](README.ja.md) | [中文](README.zh-CN.md)
 
