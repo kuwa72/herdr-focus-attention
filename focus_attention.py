@@ -124,8 +124,64 @@ def notify(message):
     )
 
 
+def self_test():
+    """Check herdr CLI compatibility without focusing anything. Exit-code oriented."""
+    problems = []
+    herdr = herdr_bin()
+
+    def run(*args):
+        try:
+            return subprocess.run(
+                [herdr, *args], capture_output=True, text=True, timeout=10
+            )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            problems.append(f"herdr {' '.join(args)} failed to run: {e}")
+            return None
+
+    if not (Path(herdr).is_file() or shutil.which("herdr")):
+        problems.append(f"herdr binary not found: {herdr}")
+
+    r = run("agent", "list")
+    if r is not None:
+        if r.returncode != 0:
+            problems.append(f"agent list failed: {r.stderr.strip()}")
+        else:
+            try:
+                agents = json.loads(r.stdout)["result"]["agents"]
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                problems.append(f"agent list: unexpected JSON shape: {e}")
+            else:
+                required = {
+                    "agent_status",
+                    "state_change_seq",
+                    "focused",
+                    "pane_id",
+                    "workspace_id",
+                }
+                for a in agents:
+                    missing = required - set(a)
+                    if missing:
+                        problems.append(
+                            f"agent list: missing fields {sorted(missing)}"
+                        )
+                        break
+
+    for args, needle in [(("agent",), "focus"), (("notification",), "show")]:
+        r = run(*args)
+        if r is not None and needle not in r.stdout + r.stderr:
+            problems.append(f"herdr {' '.join(args)}: '{needle}' not found")
+
+    for p in problems:
+        print(f"focus-attention self-test: {p}", file=sys.stderr)
+    if not problems:
+        print("focus-attention self-test: ok")
+    return 1 if problems else 0
+
+
 def main():
     args = sys.argv[1:]
+    if "--self-test" in args:
+        sys.exit(self_test())
     prev = "--prev" in args
     states = [a for a in args if not a.startswith("-")] or None
 
